@@ -1,168 +1,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tic Tac Toe - Rishikesh</title>
-  <style>
-    body { font-family: Arial; text-align: center; background: linear-gradient(135deg,#0f172a,#1e293b); color:white; margin:0; }
-    #startScreen,#gameScreen{display:none;height:100vh;justify-content:center;align-items:center;flex-direction:column}
-    #startScreen.active,#gameScreen.active{display:flex}
-    h1{font-size:2.6rem;margin-bottom:20px}
-    button{padding:12px 22px;font-size:18px;border:none;border-radius:10px;cursor:pointer;background:#22c55e;color:white;margin:6px}
-    .board{display:grid;grid-template-columns:repeat(3,110px);gap:10px;margin-top:20px}
-    .cell{width:110px;height:110px;background:#1e293b;display:flex;justify-content:center;align-items:center;font-size:2.4rem;cursor:pointer;border-radius:12px}
-    .cell:hover{background:#334155}
-    .win{background:#22c55e!important}
-    #status{margin-top:15px;font-size:22px}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe PRO - Rishikesh</title>
+
+<style>
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto}
+body{margin:0;background:#0f172a;color:white;display:flex;justify-content:center}
+.app{width:100%;max-width:420px;height:100vh;display:flex;flex-direction:column}
+.header{padding:15px;text-align:center;background:#1e293b;font-weight:bold}
+.screen{flex:1;display:none;flex-direction:column;align-items:center;padding:15px}
+.screen.active{display:flex}
+.card{background:#1e293b;padding:15px;border-radius:16px;width:100%}
+button{width:100%;padding:12px;margin-top:8px;border:none;border-radius:10px;background:#22c55e;color:white}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:300px;margin-top:10px}
+.cell{aspect-ratio:1;background:#334155;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:26px}
+.status{margin-top:10px}
+.room{font-size:13px;color:#94a3b8}
+
+/* CHAT */
+.chat-box{margin-top:15px;width:100%}
+.messages{height:150px;overflow-y:auto;background:#0f172a;padding:8px;border-radius:10px}
+.msg{padding:6px 10px;margin:4px 0;border-radius:10px;max-width:70%}
+.me{background:#22c55e;margin-left:auto}
+.other{background:#334155;margin-right:auto}
+.input-row{display:flex;margin-top:5px}
+input{flex:1;padding:8px;border-radius:8px;border:none}
+.send{width:80px;margin-left:5px}
+
+.name-input{margin-bottom:10px;padding:10px;width:100%;border-radius:10px;border:none}
+
+.online{font-size:12px;color:#22c55e;margin-top:5px}
+
+.footer{
+  position:absolute;
+  bottom:10px;
+  width:100%;
+  text-align:center;
+  font-size:13px;
+  color:#94a3b8;
+}
+.footer span{margin-left:6px}
+</style>
 </head>
 <body>
 
-<div id="startScreen" class="active">
-  <h1>RISHIKESH K THE CREATOR</h1>
-  <button onclick="startGame()">Start Game (vs AI)</button>
-  <button onclick="shareGame()">📤 Share</button>
-  <button onclick="copyLink()">🔗 Copy Link</button>
+<div class="app">
+<div class="header">Tic Tac Toe PRO</div>
+
+<div id="startScreen" class="screen active">
+  <div class="card">
+    <h3>RISHIKESH K THE CREATOR</h3>
+    <input id="name" class="name-input" placeholder="Enter your name">
+    <button onclick="createRoom()">Create Room</button>
+    <button onclick="joinRoomPrompt()">Join Room</button>
+  </div>
+  <div class="footer">📷 <span>RISHIKESH_._9</span></div>
 </div>
 
-<div id="gameScreen">
-  <h1>Tic Tac Toe (You vs AI)</h1>
-  <div class="board" id="board"></div>
-  <div id="status"></div>
-  <button onclick="restartGame()">Restart</button>
+<div id="gameScreen" class="screen">
+  <div class="card">
+    <div class="room" id="roomIdText"></div>
+    <div class="online" id="onlineStatus"></div>
+    <div class="board" id="board"></div>
+    <div class="status" id="status"></div>
+    <button onclick="restartGame()">Restart</button>
+
+    <div class="chat-box">
+      <div class="messages" id="messages"></div>
+      <div class="input-row">
+        <input id="chatInput" placeholder="Message...">
+        <button class="send" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+
+  </div>
 </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
 
 <script>
-  const boardElement = document.getElementById("board");
-  const statusText = document.getElementById("status");
+const firebaseConfig={apiKey:"YOUR_KEY",authDomain:"YOUR_DOMAIN",databaseURL:"YOUR_DB_URL",projectId:"YOUR_ID"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
 
-  let board = ["","","","","","","","",""];
-  let human = "X";
-  let ai = "O";
-  let gameActive = true;
+let roomId="";
+let player="";
+let name="";
+let board=["","","","","","","","",""];
 
-  function startGame(){
-    document.getElementById("startScreen").classList.remove("active");
-    document.getElementById("gameScreen").classList.add("active");
-    createBoard();
+function createRoom(){
+  name=document.getElementById("name").value||"Player X";
+  roomId=Math.random().toString(36).substring(2,7);
+  player="X";
+  db.ref("rooms/"+roomId).set({board,turn:"X",players:{X:name}});
+  startGame();
+}
+
+function joinRoomPrompt(){
+  const id=prompt("Enter Room ID");
+  if(id){
+    name=document.getElementById("name").value||"Player O";
+    roomId=id;player="O";
+    db.ref("rooms/"+roomId+"/players/O").set(name);
+    startGame();
   }
+}
 
-  function createBoard(){
-    boardElement.innerHTML="";
-    board.forEach((_,i)=>{
-      const cell=document.createElement("div");
-      cell.classList.add("cell");
-      cell.innerText=board[i];
-      cell.onclick=()=>playerMove(i);
-      boardElement.appendChild(cell);
+function startGame(){
+  document.getElementById("startScreen").classList.remove("active");
+  document.getElementById("gameScreen").classList.add("active");
+  document.getElementById("roomIdText").innerText="Room: "+roomId;
+
+  db.ref("rooms/"+roomId).on("value",snap=>{
+    const d=snap.val(); if(!d)return;
+    board=d.board;
+    render();
+
+    const players=d.players||{};
+    const online=Object.keys(players).length;
+    document.getElementById("onlineStatus").innerText="Players online: "+online;
+
+    document.getElementById("status").innerText=d.turn===player?"Your Turn":"Opponent Turn";
+  });
+
+  db.ref("chats/"+roomId).on("value",snap=>{
+    const msgs=snap.val()||[];
+    const box=document.getElementById("messages");
+    box.innerHTML="";
+    msgs.forEach(m=>{
+      const div=document.createElement("div");
+      div.className="msg "+(m.sender===player?"me":"other");
+      div.innerText=m.name+": "+m.text;
+      box.appendChild(div);
     });
-    statusText.innerText="Your Turn";
-  }
+    box.scrollTop=box.scrollHeight;
+  });
+}
 
-  function playerMove(i){
-    if(board[i]!==""||!gameActive) return;
-    board[i]=human;
-    updateGame();
-    if(gameActive) setTimeout(aiMove,400);
-  }
+function render(){
+  const el=document.getElementById("board"); el.innerHTML="";
+  board.forEach((v,i)=>{
+    const c=document.createElement("div");
+    c.className="cell"; c.innerText=v;
+    c.onclick=()=>move(i);
+    el.appendChild(c);
+  });
+}
 
-  function aiMove(){
-    let best = minimax(board, ai).index;
-    board[best]=ai;
-    updateGame();
-  }
+function move(i){
+  const ref=db.ref("rooms/"+roomId);
+  ref.get().then(snap=>{
+    const d=snap.val();
+    if(d.board[i]!==""||d.turn!==player)return;
+    d.board[i]=player;
+    d.turn=player==="X"?"O":"X";
+    ref.set(d);
+  });
+}
 
-  function updateGame(){
-    createBoard();
-    let winPattern = getWin();
-    if(winPattern){
-      highlight(winPattern);
-      statusText.innerText = (board[winPattern[0]]===human)?"You Win! 🎉":"AI Wins 🤖";
-      gameActive=false; return;
-    }
-    if(!board.includes("")){
-      statusText.innerText="Draw!";
-      gameActive=false; return;
-    }
-  }
+function restartGame(){
+  db.ref("rooms/"+roomId).set({board:["","","","","","","","",""],turn:"X"});
+}
 
-  function getWin(){
-    const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-    for(let p of w){
-      if(board[p[0]] && board[p[0]]===board[p[1]] && board[p[0]]===board[p[2]]) return p;
-    }
-    return null;
-  }
+function sendMessage(){
+  const input=document.getElementById("chatInput");
+  const text=input.value.trim(); if(!text)return;
 
-  function highlight(p){
-    const cells=document.querySelectorAll(".cell");
-    p.forEach(i=>cells[i].classList.add("win"));
-  }
+  const ref=db.ref("chats/"+roomId);
+  ref.get().then(snap=>{
+    let msgs=snap.val()||[];
+    msgs.push({sender:player,name:name,text:text});
+    ref.set(msgs);
+  });
 
-  function emptyIndexes(b){ return b.map((v,i)=>v===""?i:null).filter(v=>v!==null); }
-
-  function minimax(newBoard, player){
-    let avail = emptyIndexes(newBoard);
-    if(checkWin(newBoard,human)) return {score:-10};
-    if(checkWin(newBoard,ai)) return {score:10};
-    if(avail.length===0) return {score:0};
-
-    let moves=[];
-    for(let i=0;i<avail.length;i++){
-      let move={};
-      move.index=avail[i];
-      newBoard[avail[i]]=player;
-
-      if(player===ai){
-        let result=minimax(newBoard,human);
-        move.score=result.score;
-      } else {
-        let result=minimax(newBoard,ai);
-        move.score=result.score;
-      }
-
-      newBoard[avail[i]]="";
-      moves.push(move);
-    }
-
-    let bestMove;
-    if(player===ai){
-      let bestScore=-10000;
-      for(let i=0;i<moves.length;i++){
-        if(moves[i].score>bestScore){bestScore=moves[i].score;bestMove=i}
-      }
-    } else {
-      let bestScore=10000;
-      for(let i=0;i<moves.length;i++){
-        if(moves[i].score<bestScore){bestScore=moves[i].score;bestMove=i}
-      }
-    }
-
-    return moves[bestMove];
-  }
-
-  function checkWin(b,p){
-    const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-    return w.some(c=>b[c[0]]===p&&b[c[1]]===p&&b[c[2]]===p);
-  }
-
-  function restartGame(){
-    board=["","","","","","","","",""];
-    gameActive=true;
-    createBoard();
-  }
-
-  function shareGame(){
-    const data={title:"Tic Tac Toe",text:"Play this game!",url:window.location.href};
-    if(navigator.share) navigator.share(data);
-    else alert("Use Copy Link");
-  }
-
-  function copyLink(){
-    navigator.clipboard.writeText(window.location.href);
-    alert("Link copied! Share on Instagram/Snapchat 😎");
-  }
+  input.value="";
+}
 </script>
 
 </body>
